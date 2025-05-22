@@ -1,0 +1,28 @@
+{
+  "name": "langgraph-chatbot",
+  "version": "1.0.0",
+  "description": "A simple chatbot built with LangGraph.js",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "basic": "node index.js",
+    "setup": "bash setup.sh"
+  },
+  "keywords": [
+    "langgraph",
+    "chatbot",
+    "ai",
+    "llm"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@langchain/community": "^0.0.41",
+    "@langchain/langgraph": "^0.0.19",
+    "@langchain/openai": "^0.0.30",
+    "dotenv": "^16.4.4",
+    "express": "^4.18.2",
+    "langchain": "^0.2.0",
+    "zod": "^3.22.4"
+  }
+}

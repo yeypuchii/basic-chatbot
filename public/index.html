@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LangGraph.js Chat with Memory</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    #chat-container {
+      border: 1px solid #ccc;
+      padding: 20px;
+      height: 400px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      background-color: #f9f9f9;
+    }
+    .message {
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      max-width: 80%;
+    }
+    .user {
+      background-color: #dcf8c6;
+      text-align: right;
+      margin-left: auto;
+    }
+    .assistant {
+      background-color: #ebebeb;
+    }
+    #message-form {
+      display: flex;
+      margin-bottom: 20px;
+    }
+    #message-input {
+      flex-grow: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      background-color: #f0f0f0;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #666;
+    }
+    #memory-info {
+      margin-top: 20px;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      height: 100px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>LangGraph.js Chat with Memory</h1>
+  
+  <div class="controls">
+    <div>
+      <label for="session-id">Session ID:</label>
+      <input type="text" id="session-id" value="default-session" readonly>
+      <button id="new-session-btn">New Session</button>
+    </div>
+    <div>
+      <button id="clear-memory-btn">Clear Memory</button>
+      <button id="debug-memory-btn">Debug Memory</button>
+    </div>
+  </div>
+  
+  <div id="chat-container"></div>
+  
+  <form id="message-form">
+    <input type="text" id="message-input" placeholder="Type your message..." required>
+    <button type="submit">Send</button>
+  </form>
+  
+  <div class="status">
+    <div>Messages in current session: <span id="message-count">0</span></div>
+    <div>Memory status: <span id="memory-status">Ready</span></div>
+  </div>
+  
+  <div id="memory-info">Memory debugging information will appear here...</div>
+
+  <script>
+    // DOM elements
+    const chatContainer = document.getElementById('chat-container');
+    const messageForm = document.getElementById('message-form');
+    const messageInput = document.getElementById('message-input');
+    const sessionIdInput = document.getElementById('session-id');
+    const newSessionBtn = document.getElementById('new-session-btn');
+    const clearMemoryBtn = document.getElementById('clear-memory-btn');
+    const debugMemoryBtn = document.getElementById('debug-memory-btn');
+    const messageCountSpan = document.getElementById('message-count');
+    const memoryStatusSpan = document.getElementById('memory-status');
+    const memoryInfoDiv = document.getElementById('memory-info');
+    
+    // Generate a unique session ID for this browser tab
+    let sessionId = `session-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    sessionIdInput.value = sessionId;
+    
+    // Message count tracking
+    let messageCount = 0;
+    
+    // Initialize the chat
+    function initChat() {
+      chatContainer.innerHTML = '';
+      messageCount = 0;
+      updateMessageCount();
+      addMessage('Welcome to the chat! I remember our conversation. Try asking me questions in multiple messages.', 'assistant');
+    }
+    
+    // Add a message to the chat container
+    function addMessage(content, role) {
+      const messageDiv = document.createElement('div');
+      messageDiv.classList.add('message', role);
+      messageDiv.textContent = content;
+      chatContainer.appendChild(messageDiv);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      
+      if (role === 'user' || role === 'assistant') {
+        messageCount++;
+        updateMessageCount();
+      }
+    }
+    
+    // Update message count display
+    function updateMessageCount() {
+      messageCountSpan.textContent = messageCount;
+    }
+    
+    // Update memory status
+    function updateMemoryStatus(status) {
+      memoryStatusSpan.textContent = status;
+    }
+    
+    // Send message to the server
+    async function sendMessage(message) {
+      try {
+        addMessage(message, 'user');
+        messageInput.value = '';
+        messageInput.disabled = true;
+        updateMemoryStatus('Sending message...');
+        
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            message, 
+            sessionId 
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        updateMemoryStatus('Message processed');
+        addMessage(data.response, 'assistant');
+        
+        // Update memory info
+        memoryInfoDiv.textContent = `Last response: ${new Date().toLocaleTimeString()}\nSession ID: ${sessionId}\nMessages: ${data.history.length}`;
+        
+      } catch (error) {
+        console.error('Error:', error);
+        addMessage('Error: ' + error.message, 'error');
+        updateMemoryStatus('Error occurred');
+      } finally {
+        messageInput.disabled = false;
+        messageInput.focus();
+      }
+    }
+    
+    // Clear memory
+    async function clearMemory() {
+      try {
+        updateMemoryStatus('Clearing memory...');
+        
+        const response = await fetch('/clear-memory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sessionId }),
+        });
+        
+        const data = await response.json();
+        updateMemoryStatus(data.status);
+        
+        // Reset chat
+        chatContainer.innerHTML = '';
+        messageCount = 0;
+        updateMessageCount();
+        addMessage('Memory cleared. Starting a new conversation.', 'assistant');
+        
+      } catch (error) {
+        console.error('Error clearing memory:', error);
+        updateMemoryStatus('Error clearing memory');
+      }
+    }
+    
+    // Debug memory
+    async function debugMemory() {
+      try {
+        updateMemoryStatus('Fetching memory debug info...');
+        
+        const response = await fetch('/debug-memory');
+        const data = await response.json();
+        
+        memoryInfoDiv.textContent = JSON.stringify(data, null, 2);
+        updateMemoryStatus('Memory debug info fetched');
+        
+      } catch (error) {
+        console.error('Error debugging memory:', error);
+        updateMemoryStatus('Error fetching memory debug info');
+        memoryInfoDiv.textContent = 'Error: ' + error.message;
+      }
+    }
+    
+    // Create new session
+    function createNewSession() {
+      sessionId = `session-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      sessionIdInput.value = sessionId;
+      chatContainer.innerHTML = '';
+      messageCount = 0;
+      updateMessageCount();
+      updateMemoryStatus('New session created');
+      addMessage('New conversation started. I don\'t have any memory of previous chats in this session.', 'assistant');
+    }
+    
+    // Event listeners
+    messageForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const message = messageInput.value.trim();
+      if (message) {
+        sendMessage(message);
+      }
+    });
+    
+    newSessionBtn.addEventListener('click', createNewSession);
+    clearMemoryBtn.addEventListener('click', clearMemory);
+    debugMemoryBtn.addEventListener('click', debugMemory);
+    
+    // Initialize the chat
+    initChat();
+  </script>
+</body>
+</html>
